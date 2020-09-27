@@ -9,7 +9,7 @@
 class CommandLineSettings {
     public $file_name;
     public $dry_run;
-    public $connection;
+    public $database;
 
     /**
      * Check command line options
@@ -21,8 +21,7 @@ class CommandLineSettings {
      * -h – MySQL host
      * --help – which will output the above list of directives with details.
      */
-    public function __construct()
-    {
+    public function __construct() {
         $options = getopt("u:p:h:", array(
             "file:",
             "create_table",
@@ -56,14 +55,7 @@ class CommandLineSettings {
         }
 
         // attempt connection
-        $this->connection = @mysqli_connect($options['h'], $options['u'], $options['p']);
-
-        // exit on error
-        if (!$this->connection || mysqli_connect_errno()) {
-            echo "[Error] Database error: " . mysqli_connect_error() . "\n";
-            return;
-        }
-        echo "[Success] DB connection successful\n";
+        $this->database = new Database($options['h'], $options['u'], $options['p']);
     }
 
     // Outputs script usage and exits
@@ -82,6 +74,58 @@ class CommandLineSettings {
     }
 }
 
+/**
+ * Database class
+ * Responsible for all database transactions
+ */
+class Database {
+    public $connection;
+    public $database_name = "catalyst";
+
+    // Instantiate class and create a connection to mysql
+    public function __construct($host, $username, $password) {
+        // attempt connection
+        $this->connection = @new mysqli($host, $username, $password);
+
+        // exit on error
+        if (!$this->connection || mysqli_connect_errno()) {
+            echo "[Error] Database error: " . mysqli_connect_error() . "\n";
+            return;
+        }
+        echo "[Success] DB connection successful\n";
+
+        $this->createAndUseDatabase();
+    }
+
+    // Execute query (or fail)
+    public function execute($query) {
+        if (!$this->connection) {
+            die("[Error] Database connection missing\n");
+        }
+
+        // clean query
+        $query = $this->connection->real_escape_string($query);
+
+        // run query
+        if (!$this->connection->query($query)) {
+            echo "[Error] Database query error: " . $this->connection->error . "\n";
+            return;
+        }
+    }
+
+    // Create and use database (drops if already exists)
+    public function createAndUseDatabase() {
+
+        // drop if exists
+        $this->execute("DROP DATABASE IF EXISTS $this->database_name");
+
+        // create database
+        $this->execute("CREATE DATABASE $this->database_name");
+
+        // use database
+        $this->execute("USE $this->database_name");
+    }
+}
 $settings = new CommandLineSettings();
 
 ?>
