@@ -44,6 +44,9 @@ class CommandLineSettings {
 
             // create users table
             $this->database->createUsersTable();
+
+            // close connection
+            $this->database->close();
         }
 
         // check if file is specified
@@ -95,6 +98,8 @@ class CommandLineSettings {
  * Responsible for handling CSV file
  */
 class File {
+    public $users;
+
     // Instantiate class, and complete integrity checks on CSV file
     public function __construct($filename) {
         // verify file exists
@@ -112,6 +117,54 @@ class File {
         if (empty($contents)) {
             die("[Error] File is empty: $filename\n");
         }
+
+        // parse users
+        $this->parseUsers($filename);
+    }
+
+    // Parse users into an associative array
+    public function parseUsers($filename) {
+        // reset users array
+        $this->users = array();
+
+        // read csv in as array lines and remove first entry with titles
+        $raw_lines = file($filename);
+        array_shift($raw_lines);
+
+        // iterate each line and process
+        foreach ($raw_lines as $line_index => $line) {
+            // creates array of [0] name, [1] surname, [2] email
+            $user_values = array("name", "surname", "email");
+            $user = str_getcsv($line);
+
+            // iterate, check for empty values, trim excess spaces and lowercase each value
+            foreach ($user as $index => &$element) {
+                // check element exists, error if not
+                if (empty($element)) {
+                    die("[Error] Parsing file error, missing value on entry " . ($line_index + 1) . " for " . $user_values[$index] . "\n");
+                }
+
+                // trim spaces
+                $element = trim($element);
+
+                // lowercase
+                $element = strtolower($element);
+            }
+
+            // capitalise name and surname
+            $user[0] = ucfirst($user[0]);
+            $user[1] = ucfirst($user[1]);
+
+            // validate valid email address
+            $email = $user[2];
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                die("[Error] Invalid email address on entry " . ($line_index + 1) . ": $email\n");
+            }
+
+            $this->users[] = $user;
+        }
+
+        var_dump($this->users);
     }
 }
 
@@ -120,8 +173,8 @@ class File {
  * Responsible for all database transactions
  */
 class Database {
-    public $connection;
-    public $database_name = "catalyst";
+    private $connection;
+    private $database_name = "catalyst";
 
     // Instantiate class and create a connection to mysql
     public function __construct($host, $username, $password) {
@@ -171,6 +224,11 @@ class Database {
     public function createUsersTable() {
         $this->execute("CREATE TABLE users (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name VARCHAR(60) NOT NULL, surname VARCHAR(60) NOT NULL, email VARCHAR(80) NOT NULL, UNIQUE KEY unique_email (email))");
         echo "[Success] Created users table\n";
+    }
+
+    // Close database
+    public function close() {
+        $this->connection->close();
     }
 }
 $settings = new CommandLineSettings();
