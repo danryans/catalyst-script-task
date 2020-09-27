@@ -37,6 +37,12 @@ class CommandLineSettings {
         // check if create table is specified, create the tables and abandon further script execution
         if (array_key_exists("create_table", $options)) {
             $this->createDatabaseConnection($options);
+
+            // drop, create and use database
+            $this->database->createAndUseDatabase();
+
+            // create users table
+            $this->database->createUsersTable();
         }
     }
 
@@ -93,8 +99,6 @@ class Database {
             return;
         }
         echo "[Success] DB connection successful\n";
-
-        $this->createAndUseDatabase();
     }
 
     // Execute query (or fail)
@@ -113,7 +117,7 @@ class Database {
         }
     }
 
-    // Create and use database (drops if already exists)
+    // Create and use database (drops if already exists) - this includes users table
     public function createAndUseDatabase() {
 
         // drop if exists
@@ -124,6 +128,14 @@ class Database {
 
         // use database
         $this->execute("USE $this->database_name");
+
+        echo "[Success] Created and using database $this->database_name\n";
+    }
+
+    // Create users table
+    public function createUsersTable() {
+        $this->execute("CREATE TABLE users (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name VARCHAR(60) NOT NULL, surname VARCHAR(60) NOT NULL, email VARCHAR(80) NOT NULL, UNIQUE KEY unique_email (email))");
+        echo "[Success] Created users table\n";
     }
 }
 $settings = new CommandLineSettings();
