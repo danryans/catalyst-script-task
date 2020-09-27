@@ -75,6 +75,15 @@ class CommandLineSettings {
 
             // parse users
             $this->file->parseUsers();
+
+            // get sql statements of all users
+            $statements = $this->file->generateSqlStatements($this->database);
+            
+            // execute statements
+            $this->database->parseUserStatements($statements);
+
+            // success :)
+            echo "[Success] Inserted " . count($statements) . " users\n";
         }
     }
 
@@ -189,7 +198,30 @@ class File {
             $this->users[] = $user;
         }
 
-        var_dump($this->users);
+        echo "[Success] Parsed users into array\n";
+    }
+
+    // Generate sql query statement for each user
+    public function generateSqlStatements($database) {
+        // check for users
+        if (!$this->users || empty($this->users)) {
+            die("[Error] Users have not been parsed or variable is empty.\n");
+        }
+
+        // statements variable to hold all the sql lines
+        $statements = [];
+        foreach ($this->users as $user) {
+            // clean each value
+            $name = $database->cleanString($user[0]);
+            $surname = $database->cleanString($user[1]);
+            $email = $database->cleanString($user[2]);
+
+            // add statement
+            $statements[] = "INSERT INTO users VALUES (NULL, '$name', '$surname', '$email')";
+        }
+
+        // return statements
+        return $statements;
     }
 }
 
@@ -220,19 +252,14 @@ class Database {
             die("[Error] Database connection missing\n");
         }
 
-        // clean query
-        $query = $this->connection->real_escape_string($query);
-
         // run query
         if (!$this->connection->query($query)) {
-            echo "[Error] Database query error: " . $this->connection->error . "\n";
-            return;
+            die("[Error] Database query error: " . $this->connection->error . "\n");
         }
     }
 
     // Create database (drops if already exists) - this includes users table
     public function createDatabase() {
-
         // drop if exists
         $this->execute("DROP DATABASE IF EXISTS $this->database_name");
 
@@ -254,6 +281,22 @@ class Database {
     public function createUsersTable() {
         $this->execute("CREATE TABLE users (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name VARCHAR(60) NOT NULL, surname VARCHAR(60) NOT NULL, email VARCHAR(80) NOT NULL, UNIQUE KEY unique_email (email))");
         echo "[Success] Created users table\n";
+    }
+
+    // Parse statements of users
+    public function parseUserStatements($statements) {
+        foreach ($statements as $statement) {
+            $this->execute($statement);
+        }
+    }
+
+    // Clean string
+    public function cleanString($string) {
+        if (!$this->connection) {
+            die("[Error] No database connection");
+        }
+
+        return $this->connection->real_escape_string($string);
     }
 
     // Close database
