@@ -10,6 +10,7 @@ class CommandLineSettings {
     public $file_name;
     public $dry_run;
     public $database;
+    public $file;
 
     /**
      * Check command line options
@@ -44,6 +45,15 @@ class CommandLineSettings {
             // create users table
             $this->database->createUsersTable();
         }
+
+        // check if file is specified
+        if (!array_key_exists("file", $options)) {
+            echo "[Error] Missing script option: CSV File (--file)\n";
+            return;
+        }
+
+        // process file
+        $this->file = new File($options['file']);
     }
 
     // Parse, verify and connect to database if we have the necessary information from command line options
@@ -77,6 +87,31 @@ class CommandLineSettings {
        --help – this list of commands again\n
        EOL;
        return;
+    }
+}
+
+/**
+ * File class
+ * Responsible for handling CSV file
+ */
+class File {
+    // Instantiate class, and complete integrity checks on CSV file
+    public function __construct($filename) {
+        // verify file exists
+        if (!file_exists($filename)) {
+            die("[Error] File does not exist: $filename\n");
+        }
+
+        // verify it is a csv file
+        if (pathinfo($filename, PATHINFO_EXTENSION) != "csv") {
+            die("[Error] File is not a csv file: $filename\n");
+        }
+
+        // verify file is not empty
+        $contents = file_get_contents($filename);
+        if (empty($contents)) {
+            die("[Error] File is empty: $filename\n");
+        }
     }
 }
 
