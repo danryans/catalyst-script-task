@@ -7,8 +7,6 @@
  */
 
 class CommandLineSettings {
-    public $file_name;
-    public $dry_run;
     public $database;
     public $file;
 
@@ -40,13 +38,15 @@ class CommandLineSettings {
             $this->createDatabaseConnection($options);
 
             // drop, create and use database
-            $this->database->createAndUseDatabase();
+            $this->database->createDatabase();
+            $this->database->useDatabase();
 
             // create users table
             $this->database->createUsersTable();
 
             // close connection
             $this->database->close();
+            return;
         }
 
         // check if file is specified
@@ -55,8 +55,27 @@ class CommandLineSettings {
             return;
         }
 
-        // process file
-        $this->file = new File($options['file']);
+        // dry run
+        if (array_key_exists("dry_run", $options)) {
+            // create file processor
+            $this->file = new File($options['file']);
+
+            // parse users
+            $this->file->parseUsers();
+        }
+
+        // no dry_run, no create_table - begin script process and database insertion
+        if (!array_key_exists("dry_run", $options) && !array_key_exists("create_table", $options)) {
+            // create database connection and use database
+            $this->createDatabaseConnection($options);
+            $this->database->useDatabase();
+
+            // create file processor
+            $this->file = new File($options['file']);
+
+            // parse users
+            $this->file->parseUsers();
+        }
     }
 
     // Parse, verify and connect to database if we have the necessary information from command line options
@@ -99,6 +118,7 @@ class CommandLineSettings {
  */
 class File {
     public $users;
+    public $filename;
 
     // Instantiate class, and complete integrity checks on CSV file
     public function __construct($filename) {
@@ -118,17 +138,22 @@ class File {
             die("[Error] File is empty: $filename\n");
         }
 
-        // parse users
-        $this->parseUsers($filename);
+        // set filename
+        $this->filename = $filename;;
     }
 
     // Parse users into an associative array
-    public function parseUsers($filename) {
+    public function parseUsers() {
+        // check for filename
+        if (!$this->filename) {
+            die("[Error] Filename not set");
+        }
+
         // reset users array
         $this->users = array();
 
         // read csv in as array lines and remove first entry with titles
-        $raw_lines = file($filename);
+        $raw_lines = file($this->filename);
         array_shift($raw_lines);
 
         // iterate each line and process
@@ -205,8 +230,8 @@ class Database {
         }
     }
 
-    // Create and use database (drops if already exists) - this includes users table
-    public function createAndUseDatabase() {
+    // Create database (drops if already exists) - this includes users table
+    public function createDatabase() {
 
         // drop if exists
         $this->execute("DROP DATABASE IF EXISTS $this->database_name");
@@ -214,10 +239,15 @@ class Database {
         // create database
         $this->execute("CREATE DATABASE $this->database_name");
 
+        echo "[Success] Created database $this->database_name\n";
+    }
+
+    // Use database
+    public function useDatabase() {
         // use database
         $this->execute("USE $this->database_name");
 
-        echo "[Success] Created and using database $this->database_name\n";
+        echo "[Success] Using database $this->database_name\n";
     }
 
     // Create users table
